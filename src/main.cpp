@@ -3,18 +3,18 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: pwojnaro <pwojnaro@student.42.fr>          +#+  +:+       +#+        */
+/*   By: piotr <piotr@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/02/12 14:42:10 by eleni             #+#    #+#             */
-/*   Updated: 2025/03/02 14:13:01 by pwojnaro         ###   ########.fr       */
+/*   Updated: 2025/03/04 20:03:02 by piotr            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "parseConfig.hpp"
 #include "webServer.hpp"
 #include "utils.hpp"
-
-// add killing ports in the signals
+#include <thread>
+#include <vector>
 
 int main(int argc, char** argv)
 {
@@ -36,26 +36,32 @@ int main(int argc, char** argv)
         return 1;
     }
 
-	std::vector<parseConfig> parser;
-	parser = splitServers(file);
-
+    std::vector<parseConfig> parser = splitServers(file);
     file.close();
 
-	for (size_t j = 0; j < parser.size(); j++)
-	{
-		try
-		{
-			parser[j].parse(parser[j]._mainString);
-    		webServer server(parser[j]._parsingServer, parser[j]._parsingLocation);
-		    server.start();
-		}
-		catch(const std::exception& e)
-		{
-			std::cerr << e.what() << '\n';
-		}
-		// std::cout << "Server " << 1 << " configuration:\n";
-		// std::cout << parser[1]._mainString << std::endl;
-	}
+    std::vector<std::thread> threads;
+    for (size_t j = 0; j < parser.size(); j++)
+    {
+        try
+        {
+            parser[j].parse(parser[j]._mainString);
+            webServer server(parser[j]._parsingServer, parser[j]._parsingLocation);
+
+            threads.push_back(std::thread([server]() mutable
+			{
+                server.start();
+            }));
+        }
+        catch(const std::exception& e)
+        {
+            std::cerr << e.what() << '\n';
+        }
+    }
+    for(auto &t : threads)
+    {
+        if (t.joinable())
+            t.join();
+    }
 
     return 0;
 }
