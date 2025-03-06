@@ -6,7 +6,7 @@
 /*   By: piotr <piotr@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/02/16 21:11:58 by anamieta          #+#    #+#             */
-/*   Updated: 2025/03/05 21:24:10 by piotr            ###   ########.fr       */
+/*   Updated: 2025/03/06 20:20:09 by piotr            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,10 +45,14 @@ class webServer {
         std::string inputBuffer;
         std::string outputBuffer;
         bool requestComplete;
+        int cgiPipeIn[2];
+        int cgiPipeOut[2];
+        pid_t cgiPid;
     };
         std::vector<Socket> _serverSockets;
         std::unordered_map<int, Connection> _connections;
         std::string handleRequest(const std::string& fullRequest);
+        std::string executeCGI(const std::string& scriptPath, const std::string& method, const std::string& queryString, const std::string& requestBody);
         void sendResponse(Socket& clientSocket, const std::string& response);
         void setNonBlocking(int socket);
 		std::string generateDeleteResponse(const std::string& filePath);

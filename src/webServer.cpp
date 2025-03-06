@@ -6,7 +6,7 @@
 /*   By: piotr <piotr@student.42.fr>                +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/02/16 21:12:30 by anamieta          #+#    #+#             */
-/*   Updated: 2025/03/05 21:30:31 by piotr            ###   ########.fr       */
+/*   Updated: 2025/03/06 20:24:19 by piotr            ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -118,8 +118,7 @@ void webServer::setNonBlocking(int socket)
     }
 }
 
-void webServer::start()
-{
+void webServer::start() {
     std::cout << "[SUCCESS] Server started on configured ports!" << std::endl;
     while (true) {
         int pollCount = poll(_pollfds.data(), _pollfds.size(), 500);  // 500ms timeout
@@ -128,15 +127,13 @@ void webServer::start()
             continue;
         }
 
-        for (int i = _pollfds.size() - 1; i >= 0; --i)
-        {
+        for (int i = _pollfds.size() - 1; i >= 0; --i) {
             if (_pollfds[i].revents & POLLIN) {
                 auto it = std::find_if(_serverSockets.begin(), _serverSockets.end(),
-                [fd = _pollfds[i].fd](const Socket& socket)
-                {
-                return socket.getFd() == fd;});
-                if (it != _serverSockets.end())
-                {
+                    [fd = _pollfds[i].fd](const Socket& socket) {
+                        return socket.getFd() == fd;
+                    });
+                if (it != _serverSockets.end()) {
                     int clientSocket = accept(_pollfds[i].fd, nullptr, nullptr);
                     if (clientSocket < 0) {
                         std::cerr << "Error: Could not accept connection" << std::endl;
@@ -144,10 +141,7 @@ void webServer::start()
                     }
                     setNonBlocking(clientSocket);
                     addConnection(clientSocket);
-                }
-                else
-                {
-
+                } else {
                     processRead(_pollfds[i].fd);
                 }
             }
@@ -163,6 +157,102 @@ void webServer::start()
     }
 }
 
+std::string webServer::executeCGI(const std::string& scriptPath, const std::string& method, const std::string& queryString, const std::string& requestBody)
+{
+    // Remove query string from the script path
+    std::string cleanScriptPath = scriptPath;
+    size_t queryPos = cleanScriptPath.find('?');
+    if (queryPos != std::string::npos) {
+        cleanScriptPath = cleanScriptPath.substr(0, queryPos);
+    }
+
+    int pipeToChild[2];  // Parent writes to child (POST data)
+    int pipeFromChild[2]; // Parent reads from child (CGI output)
+
+    if (pipe(pipeToChild) == -1 || pipe(pipeFromChild) == -1) {
+        return "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nFailed to create pipes";
+    }
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        return "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nFailed to fork";
+    }
+
+    if (pid == 0) { // Child process (CGI script)
+        close(pipeToChild[1]); // Close write end of pipeToChild
+        close(pipeFromChild[0]); // Close read end of pipeFromChild
+
+        // Redirect stdin and stdout
+        dup2(pipeToChild[0], STDIN_FILENO);
+        dup2(pipeFromChild[1], STDOUT_FILENO);
+
+        // Set environment variables
+        setenv("REQUEST_METHOD", method.c_str(), 1);
+        setenv("QUERY_STRING", queryString.c_str(), 1);
+        setenv("CONTENT_LENGTH", std::to_string(requestBody.size()).c_str(), 1);
+        setenv("CONTENT_TYPE", "application/x-www-form-urlencoded", 1); // Adjust as needed
+        setenv("SCRIPT_NAME", cleanScriptPath.c_str(), 1);
+        setenv("PATH_INFO", "", 1); // Adjust if additional path info is present
+
+        // Execute the CGI script
+        execl(cleanScriptPath.c_str(), cleanScriptPath.c_str(), nullptr);
+
+        // If execl fails
+        std::cerr << "Failed to execute CGI script: " << cleanScriptPath << " (Error: " << strerror(errno) << ")" << std::endl;
+        exit(1);
+    } else { // Parent process (server)
+        close(pipeToChild[0]); // Close read end of pipeToChild
+        close(pipeFromChild[1]); // Close write end of pipeFromChild
+
+        // Write POST data to the CGI script (if any)
+        if (method == "POST" && !requestBody.empty()) {
+            write(pipeToChild[1], requestBody.c_str(), requestBody.size());
+        }
+        close(pipeToChild[1]); // Close write end after writing
+
+        // Read the CGI output
+        std::string cgiOutput;
+        char buffer[4096];
+        fd_set readSet;
+        int maxFd = pipeFromChild[0];
+
+        while (true) {
+            FD_ZERO(&readSet);
+            FD_SET(pipeFromChild[0], &readSet);
+
+            int activity = select(maxFd + 1, &readSet, nullptr, nullptr, nullptr);
+            if (activity < 0) {
+                std::cerr << "select() error" << std::endl;
+                break;
+            }
+
+            if (FD_ISSET(pipeFromChild[0], &readSet)) {
+                ssize_t bytesRead = read(pipeFromChild[0], buffer, sizeof(buffer));
+                if (bytesRead > 0) {
+                    cgiOutput.append(buffer, bytesRead);
+                } else if (bytesRead == 0) {
+                    break; // EOF
+                } else {
+                    std::cerr << "read() error" << std::endl;
+                    break;
+                }
+            }
+        }
+
+        close(pipeFromChild[0]); // Close read end after reading
+
+        // Wait for the child process to finish
+        int status;
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
+        {
+            return cgiOutput; // Return the CGI output as the HTTP response
+        } else {
+            return "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nCGI script failed";
+        }
+    }
+}
 void webServer::addConnection(int clientFd)
 {
     Connection conn;
@@ -179,9 +269,12 @@ void webServer::addConnection(int clientFd)
 
 void webServer::processRead(int clientSocket)
 {
+    // Only do one read per poll event
     char buffer[1024];
     ssize_t bytesRead = read(clientSocket, buffer, sizeof(buffer));
-    if (bytesRead > 0) {
+
+    if (bytesRead > 0)
+    {
         _connections[clientSocket].inputBuffer.append(buffer, bytesRead);
         if (_connections[clientSocket].inputBuffer.find("\r\n\r\n") != std::string::npos)
         {
@@ -190,20 +283,43 @@ void webServer::processRead(int clientSocket)
             updatePollEvents(clientSocket, POLLOUT);
         }
     }
-    else
+    else if (bytesRead == 0)
     {
         closeConnection(clientSocket);
+    }
+    else // bytesRead < 0
+    {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            std::cerr << "Error during read: " << strerror(errno) << std::endl;
+            closeConnection(clientSocket);
+        }
     }
 }
 
 void webServer::processWrite(int clientSocket)
 {
     Connection &conn = _connections[clientSocket];
-    if (!conn.outputBuffer.empty()) {
+    if (!conn.outputBuffer.empty())
+    {
         ssize_t bytesWritten = write(conn.socket.getFd(), conn.outputBuffer.c_str(), conn.outputBuffer.size());
-        if (bytesWritten > 0) {
+
+        if (bytesWritten > 0)
+        {
             conn.outputBuffer.erase(0, bytesWritten);
-            if (conn.outputBuffer.empty()) {
+            if (conn.outputBuffer.empty())
+            {
+                closeConnection(clientSocket);
+            }
+        }
+        else if (bytesWritten == 0)
+        {
+            closeConnection(clientSocket);
+        }
+        else
+        {
+            if (errno != EAGAIN && errno != EWOULDBLOCK)
+            {
+                std::cerr << "Error during write: " << strerror(errno) << std::endl;
                 closeConnection(clientSocket);
             }
         }
@@ -271,18 +387,35 @@ std::string webServer::handleRequest(const std::string& fullRequest)
             requestBody = fullRequest.substr(headerEnd + 4);
         }
     }
+
     path = sanitizePath(path);
     if (path.empty() || path[0] != '/')
     {
         return "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\n\r\nInvalid path";
     }
+
     std::string rootDir = "./www";
     auto it = _serverConfig.find("root");
     if (it != _serverConfig.end())
     {
         rootDir = it->second;
     }
-    
+
+    if (path.find("/cgi-bin/") == 0)
+    {
+        std::string scriptPath = rootDir + path;
+        std::string queryString;
+
+        size_t queryPos = path.find('?');
+        if (queryPos != std::string::npos)
+        {
+            queryString = path.substr(queryPos + 1);
+            path = path.substr(0, queryPos);
+        }
+
+        return executeCGI(scriptPath, method, queryString, requestBody);
+    }
+
     if (path.back() == '/')
     {
         path += "index.html";
@@ -297,6 +430,7 @@ std::string webServer::handleRequest(const std::string& fullRequest)
     {
         contentType = ctIt->second;
     }
+
     if (method == "GET")
     {
         return generateGetResponse(filePath);
