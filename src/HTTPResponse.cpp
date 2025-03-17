@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HTTPResponse.cpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: piotr <piotr@student.42.fr>                +#+  +:+       +#+        */
+/*   By: anamieta <anamieta@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/07 18:50:13 by pwojnaro          #+#    #+#             */
-/*   Updated: 2025/03/16 13:58:20 by piotr            ###   ########.fr       */
+/*   Updated: 2025/03/16 21:17:18 by anamieta         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,7 +40,7 @@ std::string HTTPResponse::generateResponse() const
 
 
 /** This function attempts to read an image file in binary mode and return its contents as a std::string.
-* By default, files in C++ are opened in text mode, jpg has to be open in binary mode. We have to to know the size 
+* By default, files in C++ are opened in text mode, jpg has to be open in binary mode. We have to to know the size
 * to set Content-Length correctly in the HTTP response
 */
 std::optional<std::string> readImageFile(const std::string& path)
@@ -52,11 +52,11 @@ std::optional<std::string> readImageFile(const std::string& path)
         return std::nullopt;
     }
 	// Move cursor to end to determine size
-    file.seekg(0, std::ios::end); 
+    file.seekg(0, std::ios::end);
     std::streamsize size = file.tellg();
 	// Move cursor back to the beginning
     file.seekg(0, std::ios::beg);
-	
+
 	// Allocate buffer and read file data
     std::vector<char> buffer(size);
     if (!file.read(buffer.data(), size))
@@ -84,13 +84,13 @@ std::pair<std::string, std::string> HTTPResponse::getDefaultErrorPage(int errorC
     {
         return {*content, "image/jpeg"};
     }
-    
+
     auto defaultContent = readImageFile(defaultImagePath);
     if (defaultContent)
     {
         return {*defaultContent, "image/jpeg"};
     }
-    
+
     std::cerr << "[ERROR] Missing default error image: " << defaultImagePath << std::endl;
     std::cout << "[INFO] Returning text fallback for error " << errorCode << std::endl;
     return {"Error " + std::to_string(errorCode) + ": Missing error page.", "text/plain"};
@@ -98,7 +98,7 @@ std::pair<std::string, std::string> HTTPResponse::getDefaultErrorPage(int errorC
 
 
 /**
- * When a web server sends a response, it must include the Content-Type header so 
+ * When a web server sends a response, it must include the Content-Type header so
  * that browsers or other clients know how to handle the content.
  */
 std::string HTTPResponse::getContentType(const std::string& filePath)

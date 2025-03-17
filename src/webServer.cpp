@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   webServer.cpp                                      :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: piotr <piotr@student.42.fr>                +#+  +:+       +#+        */
+/*   By: anamieta <anamieta@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/02/16 21:12:30 by anamieta          #+#    #+#             */
-/*   Updated: 2025/03/16 15:58:24 by piotr            ###   ########.fr       */
+/*   Updated: 2025/03/17 15:52:05 by anamieta         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,35 +24,35 @@ webServer::webServer(const std::unordered_multimap<std::string, std::string>& se
 	const std::unordered_multimap<std::string, std::vector<std::string>>& locationConfig)
 : _serverConfig(serverConfig), _locationConfig(locationConfig), _socketManager()
 {
-std::cout << "[INFO] Initializing web server..." << std::endl;
+    std::cout << "[INFO] Initializing web server..." << std::endl;
 
-for (const auto& entry : _serverConfig)
-{
-if (entry.first == "listen")
-{
-int port = std::stoi(entry.second);
+    for (const auto& entry : _serverConfig)
+    {
+        if (entry.first == "listen")
+        {
+            int port = std::stoi(entry.second);
 
-if (auto portStatus = _socketManager.isPortAvailable(port); portStatus.has_value()) {
-std::cerr << "Error: Port " << port << " is already in use. Details: " << *portStatus << std::endl;
-continue;
-}
+            if (auto portStatus = _socketManager.isPortAvailable(port); portStatus.has_value()) {
+                std::cerr << "Error: Port " << port << " is already in use. Details: " << *portStatus << std::endl;
+                continue;
+            }
 
-try {
-_socketManager.createSocket(port);
-}
-catch (const std::runtime_error& e)
-{
-std::cerr << "Error: " << e.what() << std::endl;
-continue;
-}
-}
-}
+            try {
+                _socketManager.createSocket(port);
+            }
+            catch (const std::runtime_error& e)
+            {
+                std::cerr << "Error: " << e.what() << std::endl;
+                continue;
+            }
+        }
+    }
 
-if (_socketManager.getServerSockets().empty())
-{
-std::cerr << "Error: No valid server sockets created" << std::endl;
-throw std::runtime_error("No valid server sockets created");
-}
+    if (_socketManager.getServerSockets().empty())
+    {
+        std::cerr << "Error: No valid server sockets created" << std::endl;
+        throw std::runtime_error("No valid server sockets created");
+    }
 }
 
 void webServer::start()
@@ -132,7 +132,7 @@ void webServer::processRead(int clientSocket)
         closeConnection(clientSocket);
         return;
     }
-	
+
     std::string fullRequest = readFullRequest(clientSocket);
     if (fullRequest.empty())
     {
@@ -156,8 +156,8 @@ void webServer::processRead(int clientSocket)
     size_t maxBodySize = getClientMaxBodySize(conn.serverName);
     if (fullRequest.size() > maxBodySize)
     {
-        std::cerr << "[ERROR] Request size (" << fullRequest.size() 
-                  << " bytes) exceeds client_max_body_size (" << maxBodySize 
+        std::cerr << "[ERROR] Request size (" << fullRequest.size()
+                  << " bytes) exceeds client_max_body_size (" << maxBodySize
                   << " bytes) for server " << conn.serverName << "\n";
         std::string response = generateErrorResponse(413, "Payload Too Large");
         sendResponse(conn.socket, response);
@@ -204,9 +204,9 @@ void webServer::processWrite(int clientSocket)
 
 void webServer::updatePollEvents(int fd, short newEvent)
 {
-    auto it = std::find_if(_socketManager.getPollFds().begin(), _socketManager.getPollFds().end(), 
+    auto it = std::find_if(_socketManager.getPollFds().begin(), _socketManager.getPollFds().end(),
         [fd](const struct pollfd& pfd) { return pfd.fd == fd; });
-    
+
     if (it != _socketManager.getPollFds().end())
 	{
         it->events = newEvent;
@@ -278,13 +278,13 @@ std::string webServer::resolveFilePath(const std::string& path, const std::strin
         return "";
     if (resolvedPath.find("/cgi-bin/") == 0)
         return rootDir + resolvedPath;
-    
+
     // Debug: Print out all entries in _rootDirectories
     std::cout << "[DEBUG] _rootDirectories contents:\n";
     for (const auto& [loc, root] : _rootDirectories) {
         std::cout << "  Location: '" << loc << "', Root: '" << root << "'\n";
     }
-    
+
     // Check for location-specific root directory from _rootDirectories
     std::string matchedLocation = "";
     std::string locationRootDir = rootDir; // Default to server root
@@ -299,7 +299,7 @@ std::string webServer::resolveFilePath(const std::string& path, const std::strin
             }
         }
     }
-    
+
     if (!matchedLocation.empty()) {
         std::string relativePath = resolvedPath.substr(matchedLocation.size());
         if (relativePath.empty() || relativePath[0] != '/')
@@ -307,7 +307,7 @@ std::string webServer::resolveFilePath(const std::string& path, const std::strin
         std::cout << "[DEBUG] Final path: '" << locationRootDir + relativePath << "'\n";
         return locationRootDir + relativePath;
     }
-    
+
     // Check for alias mapping
     for (const auto& [locationPrefix, aliasDir] : _aliasDirectories) {
         if (resolvedPath.compare(0, locationPrefix.size(), locationPrefix) == 0) {
@@ -337,12 +337,12 @@ std::string urlDecode(const std::string& encoded)
 			{
                 result += encoded[i];
             }
-        } 
-		else if (encoded[i] == '+') 
+        }
+		else if (encoded[i] == '+')
 		{
             result += ' ';
-        } 
-		else 
+        }
+		else
 		{
             result += encoded[i];
         }
@@ -400,7 +400,7 @@ std::string webServer::handleRequest(const std::string& fullRequest) {
             return response.str();
         }
     }
-	
+
     for (const auto& [location, redirection] : _redirections) {
         if (rawPath.find(location) == 0 || decodedPath.find(location) == 0) {
             std::cout << "[DEBUG] Redirection match found for location: " << location << "\n";
@@ -444,7 +444,7 @@ std::string webServer::handleRequest(const std::string& fullRequest) {
         if (cgiPass.empty() || scriptFilename.empty()) {
             return generateErrorResponse(500, "CGI configuration is incomplete for location: /cgi-bin/");
         }
-        std::string rootDir = "./www"; // Default root directory
+        std::string rootDir = _cgiRootDir; // Use the configured CGI root directory
         for (const std::string& directive : itCgi->second) {
             if (directive.find("root") == 0) {
                 size_t pos = directive.find_first_of(" \t");
@@ -492,17 +492,17 @@ std::string webServer::handleRequest(const std::string& fullRequest) {
 				}
 				std::string boundary = contentType.substr(boundaryPos + 9);
 				boundary = "--" + boundary;
-				
+
 				// Get the request body
 				std::string body = httpRequest.getBody();
-				
+
 				// Check the Content-Length before processing
-				std::string contentLengthStr = httpRequest.getHeader("Content-Length");				
+				std::string contentLengthStr = httpRequest.getHeader("Content-Length");
 				// Process the upload if size check passes
 				return generateSuccessResponse("Files uploaded successfully");
 			}
         }
-        
+
         // For all other POST requests, delegate to generatePostResponse
         return generatePostResponse(httpRequest.getBody(), contentType, serverName);
     }
@@ -518,13 +518,13 @@ std::string webServer::handleRequest(const std::string& fullRequest) {
     struct stat st;
     if (stat(filePath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
         std::cout << "[DEBUG] Path is a directory\n";
-        
+
         // Check autoindex configuration.
         bool autoindexEnabled = false;
         std::string matchedLocation = "";
         std::cout << "[DEBUG] Autoindex Configuration:\n";
         for (const auto& [loc, enabled] : _autoindexConfig) {
-            std::cout << "  - Location: '" << loc << "', Autoindex: " 
+            std::cout << "  - Location: '" << loc << "', Autoindex: "
                       << (enabled ? "on" : "off") << "\n";
         }
         for (const auto& locationPair : _autoindexConfig) {
@@ -536,7 +536,7 @@ std::string webServer::handleRequest(const std::string& fullRequest) {
                 }
             }
         }
-        std::cout << "[DEBUG] Matched Location: " << matchedLocation 
+        std::cout << "[DEBUG] Matched Location: " << matchedLocation
                   << ", Autoindex: " << (autoindexEnabled ? "on" : "off") << "\n";
 
         if (autoindexEnabled) {
@@ -578,7 +578,7 @@ std::string webServer::generateGetResponse(const std::string& filePath)
         return errorResponse.generateResponse();
     }
 
-    std::cout << "[INFO] Serving file: " << filePath << " (" 
+    std::cout << "[INFO] Serving file: " << filePath << " ("
               << fileContent.size() << " bytes, " << contentType << ")" << std::endl;
 
     HTTPResponse response(200, contentType, std::string(fileContent.data(), fileContent.size()));
@@ -764,19 +764,19 @@ std::string webServer::generateDeleteResponse(const std::string& filePath)
     std::string adjustedFilePath;
     const std::string marker = "/upload/";
     size_t pos = filePath.find(marker);
-    
+
     if (pos != std::string::npos) {
         std::string filename = filePath.substr(pos + marker.length());
         adjustedFilePath = "./www/html/upload/" + filename;
     } else {
         adjustedFilePath = filePath;
     }
-    
-    if (!FileUtils::deleteFile(adjustedFilePath)) 
+
+    if (!FileUtils::deleteFile(adjustedFilePath))
 	{
         return generateErrorResponse(500, "Failed to delete file");
     }
-    
+
     return "HTTP/1.1 204 No Content\r\n\r\n";
 }
 
@@ -792,7 +792,7 @@ void webServer::sendResponse(Socket& clientSocket, const std::string& response)
 std::string webServer::generateMethodNotAllowedResponse()
 {
     auto [errorContent, errorContentType] = HTTPResponse::getDefaultErrorPage(405);
-        
+
     std::stringstream response;
     response << "HTTP/1.1 405 Method Not Allowed\r\n";
     response << "Content-Type: " << errorContentType << "\r\n";
@@ -800,7 +800,7 @@ std::string webServer::generateMethodNotAllowedResponse()
     response << "Allow: GET, POST, DELETE\r\n";
     response << "Connection: close\r\n";
     response << "\r\n";
-    
+
     response.write(errorContent.data(), errorContent.size());
     return response.str();
 }
@@ -815,7 +815,7 @@ std::string webServer::getFilePath(const std::string& path)
     return basePath + path;
 }
 
-std::string webServer::executeCGI(const std::string& scriptPath, const std::string& method, 
+std::string webServer::executeCGI(const std::string& scriptPath, const std::string& method,
     const std::string& queryString, const std::string& requestBody)
 {
     // Remove any query string from the script path.
@@ -848,11 +848,11 @@ std::string webServer::executeCGI(const std::string& scriptPath, const std::stri
         setenv("SCRIPT_FILENAME", cleanScriptPath.c_str(), 1);
         setenv("PATH_INFO", cleanScriptPath.c_str(), 1);
 
-        // Execute the Python interpreter with the CGI script as argument.
-        execlp("/usr/bin/python3", "python3", cleanScriptPath.c_str(), nullptr);
+        // Execute the CGI interpreter with the script as argument.
+        execlp(_cgiInterpreter.c_str(), _cgiInterpreter.c_str(), cleanScriptPath.c_str(), nullptr);
 
         // If execlp returns, an error occurred.
-        std::cerr << "Failed to execute CGI script: " << cleanScriptPath 
+        std::cerr << "Failed to execute CGI script: " << cleanScriptPath
                   << " (Error: " << strerror(errno) << ")" << std::endl;
         exit(1);
     }
@@ -868,7 +868,7 @@ std::string webServer::executeCGI(const std::string& scriptPath, const std::stri
     std::string cgiOutput;
     char buffer[4096];
     fd_set readSet;
-    
+
     while (true) {
         FD_ZERO(&readSet);
         FD_SET(pipeFromChild[0], &readSet);
@@ -958,7 +958,7 @@ void webServer::setServerNames(const std::map<std::string, std::string>& serverN
 }
 void webServer::setClientMaxBodySize(const std::string& serverName, size_t size) {
     _clientMaxBodySizes[serverName] = size;
-    std::cout << "[DEBUG] Set client_max_body_size for server '" << serverName 
+    std::cout << "[DEBUG] Set client_max_body_size for server '" << serverName
               << "' to " << size << " bytes\n";
 }
 
@@ -966,32 +966,32 @@ size_t webServer::getClientMaxBodySize(const std::string& serverName) const {
     // Try exact match first
     auto it = _clientMaxBodySizes.find(serverName);
     if (it != _clientMaxBodySizes.end()) {
-        std::cout << "[DEBUG] Found client_max_body_size for server '" << serverName 
+        std::cout << "[DEBUG] Found client_max_body_size for server '" << serverName
                  << "': " << it->second << " bytes\n";
         return it->second;
     }
-    
+
     // Try without port number
     size_t colonPos = serverName.find(":");
     if (colonPos != std::string::npos) {
         std::string nameWithoutPort = serverName.substr(0, colonPos);
         it = _clientMaxBodySizes.find(nameWithoutPort);
         if (it != _clientMaxBodySizes.end()) {
-            std::cout << "[DEBUG] Found client_max_body_size for server '" << nameWithoutPort 
+            std::cout << "[DEBUG] Found client_max_body_size for server '" << nameWithoutPort
                      << "': " << it->second << " bytes\n";
             return it->second;
         }
     }
-    
+
     // Try just "localhost" as fallback
     it = _clientMaxBodySizes.find("localhost");
     if (it != _clientMaxBodySizes.end()) {
-        std::cout << "[DEBUG] Found client_max_body_size for 'localhost': " 
+        std::cout << "[DEBUG] Found client_max_body_size for 'localhost': "
                  << it->second << " bytes\n";
         return it->second;
     }
-    
-    std::cout << "[DEBUG] Using default client_max_body_size for server '" << serverName 
+
+    std::cout << "[DEBUG] Using default client_max_body_size for server '" << serverName
              << "': 1048576 bytes\n";
     return 1048576;
 }
@@ -1049,7 +1049,7 @@ std::string webServer::readFullRequest(int clientSocket) {
     std::string request;
     char buffer[4096] = {0};
     ssize_t bytesRead;
-    
+
     // Read headers
     while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0)) > 0) {
         if (bytesRead <= 0) {
@@ -1135,4 +1135,20 @@ std::string webServer::generateSuccessResponse(const std::string& message) {
 }
 void webServer::setRootDirectories(const std::map<std::string, std::string>& rootDirectories) {
     _rootDirectories = rootDirectories;
+}
+
+void webServer::setCgiPass(const std::string& cgiPass) {
+    this->cgiPass = cgiPass;
+}
+
+std::string webServer::getCgiPass() const {
+    return cgiPass;
+}
+
+void webServer::setScriptFilename(const std::string& scriptFilename) {
+    this->scriptFilename = scriptFilename;
+}
+
+std::string webServer::getScriptFilename() const {
+    return scriptFilename;
 }

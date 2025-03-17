@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   webServer.hpp                                      :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: piotr <piotr@student.42.fr>                +#+  +:+       +#+        */
+/*   By: anamieta <anamieta@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/02/16 21:11:58 by anamieta          #+#    #+#             */
-/*   Updated: 2025/03/16 15:50:33 by piotr            ###   ########.fr       */
+/*   Updated: 2025/03/17 15:55:11 by anamieta         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,8 +60,17 @@ class webServer {
         void setAllowedMethods(const std::map<std::string, std::vector<std::string>>& allowedMethods) {
             _allowedMethods = allowedMethods;
         }
-		
-		
+		void setCgiInterpreter(const std::string& interpreter) {
+			_cgiInterpreter = interpreter;
+		}
+		void setCgiRootDir(const std::string& rootDir) {
+			_cgiRootDir = rootDir;
+		}
+        void setCgiPass(const std::string& cgiPass);
+        std::string getCgiPass() const;
+        void setScriptFilename(const std::string& scriptFilename);
+        std::string getScriptFilename() const;
+
     private:
 	struct Connection
 	{
@@ -74,15 +83,17 @@ class webServer {
 		pid_t cgiPid;
 		std::string serverName;
 	};
+    	std::string _cgiInterpreter;
+    	std::string _cgiRootDir;
         std::map<std::string, std::vector<std::string>> _allowedMethods;
 		std::map<std::string, std::string> _aliasDirectories;
 		std::map<std::string, size_t> _clientMaxBodySizes;
 		std::map<std::string, bool> _autoindexConfig;
 		std::map<std::string, std::string> _serverNames;
-		std::map<std::string, std::string> _redirections; 
+		std::map<std::string, std::string> _redirections;
 		std::unordered_multimap<std::string, std::string> _serverConfig;
 		std::unordered_multimap<std::string, std::vector<std::string>> _locationConfig;
-		SocketManager _socketManager; 
+		SocketManager _socketManager;
         std::unordered_map<int, Connection> _connections;
 		std::map<std::string, std::string> _rootDirectories;
         std::string handleRequest(const std::string& fullRequest);
@@ -113,4 +124,6 @@ class webServer {
 		std::string handleMultipartUpload(const std::string& requestBody, const std::string& contentType, const std::string& uploadDir);
 		std::string handleFormUrlEncodedUpload(const std::string& requestBody,const std::string& uploadDir);
 		std::string handleTextUpload(const std::string& requestBody, const std::string& uploadDir);
+        std::string cgiPass;
+        std::string scriptFilename;
 };
